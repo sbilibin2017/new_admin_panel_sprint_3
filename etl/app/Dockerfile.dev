@@ -1,0 +1,33 @@
+# base image
+FROM python:3.10
+
+# enviironment variables
+ENV HOME=/
+ENV APP_HOME=/app
+ENV GROUP=django
+
+# create app directory
+WORKDIR $APP_HOME
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE 'config.settings'
+ENV PYTHONPATH=${PYTHONPATH}:${PWD} 
+
+
+RUN apt-get update && \
+    apt-get install -y gettext && \
+    apt install -y ncat && \
+    python -m pip install --upgrade pip && \
+    pip3 install poetry
+
+COPY . $APP_HOME
+
+RUN poetry config virtualenvs.create false
+RUN poetry install 
+
+EXPOSE 8000
+
+RUN chmod +x ./docker-entrypoint.dev.sh
+
+ENTRYPOINT ["./docker-entrypoint.dev.sh"]

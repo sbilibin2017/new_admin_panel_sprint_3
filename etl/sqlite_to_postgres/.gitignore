@@ -1,0 +1,4 @@
+.env
+load_data.log
+**/__pycache__
+venv/

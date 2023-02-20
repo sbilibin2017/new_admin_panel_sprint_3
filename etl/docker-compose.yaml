@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - 5432
+    env_file:
+      - ./db/.env.dev
+
+  sqlite_to_postgres:
+    build:
+      context: ./sqlite_to_postgres
+      dockerfile: Dockerfile.dev    
+    env_file:
+      - ./sqlite_to_postgres/.env.dev
+    depends_on:
+      - db
+
+  es01:
+    image: elasticsearch:7.7.0  
+    environment:
+      - discovery.type=single-node
+    volumes:
+      - es_data:/usr/share/elasticsearch-one/data    
+    ports:
+      - 9200:9200    
+    depends_on:
+      - db
+  
+  postgres_to_es:
+    build: 
+      context: ./postgres_to_es
+      dockerfile: Dockerfile.dev 
+    volumes:
+      - ./postgres_to_es:/postgres_to_es
+    depends_on:
+      - es01 
+    env_file:
+      - ./postgres_to_es/.env.dev
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.dev 
+    volumes:         
+      - ./app:/app
+    expose:
+      - 8000
+    env_file:
+      - ./app/.env.dev
+    depends_on:
+      - postgres_to_es
+
+  nginx: 
+    image: nginx:1.21.1
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro         
+      - ./app/static:/app/static
+    depends_on:
+      - app
+    ports:
+      - 8000:80
+
+volumes:
+  postgres_data:
+  es_data:
+  
+  
