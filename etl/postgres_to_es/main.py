@@ -4,7 +4,7 @@ from pathlib import Path
 
 import psycopg2
 from dotenv import load_dotenv
-from psycopg2.extras import DictCursor
+
 from src.extract import extract
 from src.load import load
 from src.transform import transform
@@ -20,35 +20,26 @@ def main():
     load_dotenv(PATH_TO_ENV)
 
     postgres_dict, es_conn, state = setup_connections()
-    current_state = state.get_state('updated_at')
     min_state, max_state = get_min_max_state(postgres_dict)
-
+    current_state = state.get_state('updated_at')
     if current_state is None:
         state.set_state('updated_at', max_state)
         current_state = state.get_state('updated_at')
         return current_state, min_state
     elif current_state != min_state:
-        # try:
-        with psycopg2.connect(**postgres_dict) as postgres_conn:                
-            df, df_fwg, df_fwp = extract(postgres_conn, current_state)
-            data, l_updated_at = transform(df, df_fwg, df_fwp)
-            load(data, es_conn, state, l_updated_at)
-            return current_state, min_state
-                # except BaseException:
-                #     logger.info('There is no new records...')
-                #     return current_state, min_state
-        # except psycopg2.OperationalError:
-        #     logger.info('cant connect to postgres ...')
-        #     sys.exit(1)
+        try:
+            with psycopg2.connect(**postgres_dict) as postgres_conn:
+                df, df_fwg, df_fwp = extract(postgres_conn, current_state)
+                data, l_updated_at = transform(df, df_fwg, df_fwp)
+                load(data, es_conn, state, l_updated_at)
+                return current_state, min_state
+        except psycopg2.OperationalError:
+            logger.info('cant connect to postgres ...')
+            sys.exit(1)
 
 
 if __name__ == '__main__':
-    ITERATION, SLEEP = 1, 5
+    SLEEP = 5
     while True:
-        current_state, min_state = main()
-        logger.info(f'ITERATION:{ITERATION} | current_state:{current_state}, min_state:{min_state}')
-        ITERATION += 1
-        if current_state == min_state:
-            time.sleep(SLEEP*10)
-        else:
-            time.sleep(SLEEP)
+        main()
+        time.sleep(SLEEP)

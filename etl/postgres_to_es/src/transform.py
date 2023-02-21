@@ -1,9 +1,15 @@
+import uuid
+from datetime import datetime
+from typing import Dict, Tuple
+
 import pandas as pd
+
 from utils.validators import PreparedData
 
 
-def build_es_data(filmwork_id, df, df_fwg, df_fwp):
-
+def build_es_data(
+    filmwork_id: uuid.UUID, df: pd.DataFrame, df_fwg: pd.DataFrame, df_fwp: pd.DataFrame
+) -> Tuple[Dict, datetime]:
     DEFAULT_NUM = -1.0
     DEFAULT_STR = ''
     DEFAULT_LIST = []
@@ -18,9 +24,9 @@ def build_es_data(filmwork_id, df, df_fwg, df_fwp):
     d['imdb_rating'] = df_sub['rating'].iloc[0]
     d['genre'] = df_fwg_sub['name'].unique().tolist()
     d['title'] = df_sub['title'].iloc[0] or DEFAULT_STR
-    d['description'] = df_sub['description'].iloc[0] or DEFAULT_STR   
+    d['description'] = df_sub['description'].iloc[0] or DEFAULT_STR
     subdf_dir = df_fwp_sub[df_fwp_sub['role'] == 'director']
-    if len(subdf_dir)>0:
+    if len(subdf_dir) > 0:
         d['director'] = [subdf_dir['name'].iloc[0]]
     else:
         d['director'] = DEFAULT_LIST

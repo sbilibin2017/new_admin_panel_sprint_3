@@ -25,6 +25,8 @@ mypy = "==1.0.0"
 pre-commit = "==3.0.4"
 Flake8-pyproject = "==1.2.2"
 pyproject-autoflake = "==1.0.0"
+redis = "==4.5.1"
+
 
 [tool.autoflake]
 in-place=true

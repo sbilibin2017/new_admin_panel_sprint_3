@@ -3,7 +3,7 @@ FROM python:3.10
 
 # enviironment variables
 ENV APP_HOME=/postgres_to_es
-
+# enviironment variables
 # create app directory
 WORKDIR $APP_HOME
 
