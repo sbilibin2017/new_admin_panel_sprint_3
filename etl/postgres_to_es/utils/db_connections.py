@@ -2,8 +2,9 @@ import json
 import os
 from pathlib import Path
 
+import psycopg2
 from elasticsearch import Elasticsearch
-
+from psycopg2.extras import DictCursor
 from utils.state import State
 from utils.validators import PostgresConfig
 
@@ -49,3 +50,13 @@ def setup_connections():
     # fix current state of etl
     state = State(os.getenv('STATE_FILENAME'))
     return postgres_dict, es_conn, state
+
+
+def get_min_max_state(postgres_dict):
+    with psycopg2.connect(**postgres_dict) as postgres_conn:
+        with postgres_conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""SELECT min(updated_at) FROM filmwork""")
+            min_state = cursor.fetchall()[0][0]
+            cursor.execute("""SELECT max(updated_at) FROM filmwork""")
+            max_state = cursor.fetchall()[0][0]
+            return min_state, max_state

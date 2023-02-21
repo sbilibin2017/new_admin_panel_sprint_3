@@ -1,6 +1,6 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 
 class PostgresConfig(BaseModel):
@@ -17,7 +17,8 @@ class PreparedData(BaseModel):
     genre: List[str]
     title: str
     description: str
-    actors_names: str
+    director: List[str]
+    actors_names: List[str]
     actors: List[Dict]
-    writers_names: str
+    writers_names: List[str]
     writers: List[Dict]

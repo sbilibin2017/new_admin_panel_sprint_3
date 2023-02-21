@@ -13,7 +13,7 @@ def get_filmwork_query(current_state):
     query = f"""
                 SELECT {filmwork_keys}
                 FROM filmwork
-                WHERE updated_at < %s
+                WHERE updated_at <= %s
                 ORDER BY updated_at DESC
             """
     return query, current_state
@@ -64,26 +64,33 @@ def get_filmwork_person_4idxs(cursor, df):
     return df
 
 
+def get_dataframes(cursor, chunk):
+    df = get_filmwork_4idxs(chunk)
+    # dataframe with filmwork and genres
+    df_fwg = get_filmwork_genre_4idxs(cursor, df)
+    # dataframe with filmwork and persons
+    df_fwp = get_filmwork_person_4idxs(cursor, df)
+    return df, df_fwg, df_fwp
+
+
+CHUNK_SIZE = 1000
+
+
 def extract(postgres_conn, current_state) -> Tuple[Dict]:
-    '''Extracts data from postgres.'''
-    # current state of etl
-    logger.info('getting current state ...')
+    '''Extracts data from postgres.'''    
     # query for current state and filmworks
+    logger.info('getting current state ...')
     query, current_state = get_filmwork_query(current_state)
     try:
         # connecting to postgres
         logger.info('connecting to postgre ...')
         with postgres_conn.cursor(cursor_factory=DictCursor) as cursor:
-            logger.info('\texecuting query ...')
-            print('----------------------')
+            logger.info('\t[connected] executing query ...')            
             cursor.execute(query, (current_state,))
-            chunk = cursor.fetchmany(100)
-            # dataframe with filmworks
-            df = get_filmwork_4idxs(chunk)
-            # dataframe with filmwork and genres
-            df_fwg = get_filmwork_genre_4idxs(cursor, df)
-            # dataframe with filmwork and persons
-            df_fwp = get_filmwork_person_4idxs(cursor, df)
+            chunk = cursor.fetchmany(CHUNK_SIZE)
+            # dataframes
+            logger.info('\t[connected] preparing dataframes ...')
+            df, df_fwg, df_fwp = get_dataframes(cursor, chunk)
             return df, df_fwg, df_fwp
     except psycopg2.OperationalError:
         logger.info('cant connect to postgres ...')

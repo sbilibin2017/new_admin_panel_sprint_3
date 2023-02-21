@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,8 +11,6 @@ def load(data, es_conn, state, l_updated_at):
     # загрузка переенных окружения
     load_dotenv(BASE_DIR / '.env.dev')
     for row, new_updated_at in zip(data, l_updated_at):
-        print(row)
         es_conn.index(index='movies', doc_type="_doc", id=row['id'], body=row)
-        state.set_state('updated_at', new_updated_at)
-        print(new_updated_at)
+        state.set_state('updated_at', new_updated_at)        
         logger.info(f'New updatet_at: {new_updated_at} ...')
