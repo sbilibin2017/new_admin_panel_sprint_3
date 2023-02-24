@@ -19,8 +19,6 @@
 |элемент|описание|
 |---|---|
 |db|постгрес база данных(инициализация, бэкап)|
-|app|джанго админка(голый джанго+дрф)|
-|nginx|отдача статики|
 |sqlite_to_postgres|миграция из sqlite в postgres|
 |postgres_to_es|миграция из postgres в elasticsearch|
 
