@@ -36,3 +36,5 @@
 
 ## Инструкция по развертыванию:
 развернуть в режиме разработки:```docker compose -f docker-compose.dev.yaml up --build```
+
+

@@ -1,9 +1,9 @@
-from typing import Dict, List, Union
+from datetime import datetime
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 
 
-class PostgresConfig(BaseModel):
+class PostgresPydantic(BaseModel):
     dbname: str
     user: str
     password: str
@@ -11,14 +11,46 @@ class PostgresConfig(BaseModel):
     port: int
 
 
-class PreparedData(BaseModel):
+class EsPydantic(BaseModel):
+    host: str
+    port: int
+
+
+class RedisPydantic(BaseModel):
+    host: str
+    port: int
+
+
+class IndexData(BaseModel):
     id: str
     imdb_rating: float
-    genre: List[str]
+    genre: list[str]
     title: str
     description: str
-    director: List[str]
-    actors_names: List[str]
-    actors: List[Dict]
-    writers_names: List[str]
-    writers: List[Dict]
+    director: str
+    actors_names: list[str]
+    actors: list[dict]
+    writers_names: list[str]
+    writers: list[dict]
+
+
+class FilmworkPydantic(BaseModel):
+    id: str
+    rating: float
+    title: str
+    description: str
+    updated_at: datetime
+
+
+class FilmworkGenrePydantic(BaseModel):
+    filmwork_id: str
+    genre_id: str
+    name: str
+    description: str
+
+
+class FilmworkPersonPydantic(BaseModel):
+    filmwork_id: str
+    person_id: str
+    full_name: str
+    role: str

@@ -8,7 +8,6 @@ class State:
     """Class for fixing and receiving etl status."""
 
     def __init__(self, redisclient: redis.Redis) -> None:
-        #
         self.redisclient = redisclient
 
     def set_state(self, key: str, value: Any) -> None:

@@ -1,73 +1,95 @@
 import json
-import os
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path
-from typing import Dict, Tuple
 
+import backoff
+import config
+import elasticsearch
 import psycopg2
+import pydantic
 import redis
 from elasticsearch import Elasticsearch
-from psycopg2.extras import DictCursor
-
+from utils.logger import logger
 from utils.state import State
-from utils.validators import PostgresConfig
+from utils.validators import EsPydantic, PostgresPydantic, RedisPydantic
 
-# project root
 BASE_DIR = Path(__file__).resolve().parent.parent
-PATH_TO_ENV = BASE_DIR / '.env.dev'
 
 
-def get_postgres_dict():
+@backoff.on_exception(backoff.expo, psycopg2.OperationalError, max_tries=5)
+def get_postgres_conn(PostgresConfig: pydantic.BaseModel) -> psycopg2.connect:
     '''Get postgres params.'''
-    postgres_dict = {
-        'dbname': os.getenv('POSTGRES_DB'),
-        'user': os.getenv('POSTGRES_USER'),
-        'password': os.getenv('POSTGRES_PASSWORD'),
-        'host': os.getenv('POSTGRES_HOST'),
-        'port': os.getenv('POSTGRES_PORT'),
+    d = {
+        'dbname': config.POSTGRES_DB,
+        'user': config.POSTGRES_USER,
+        'password': config.POSTGRES_PASSWORD,
+        'host': config.POSTGRES_HOST,
+        'port': config.POSTGRES_PORT,
     }
-    postgres_dict = PostgresConfig(
-        host=postgres_dict['host'],
-        port=postgres_dict['port'],
-        dbname=postgres_dict['dbname'],
-        user=postgres_dict['user'],
-        password=postgres_dict['password'],
-    ).dict()
-    return postgres_dict
+    d = PostgresPydantic(**d).dict()
+    try:
+        return psycopg2.connect(**d)
+    except psycopg2.OperationalError as error:
+        logger.error(error)
 
 
-def get_es_instance():
+@backoff.on_exception(backoff.expo, elasticsearch.ConnectionError, max_tries=5)
+def get_es_conn(EsPydantic: pydantic.BaseModel) -> Elasticsearch:
     '''Get elasticsearch instance.'''
-    return Elasticsearch([os.getenv('ES_DSL')], retry_on_timeout=True)
+    d = {'host': config.ES_HOST, 'port': config.ES_PORT}
+    d = EsPydantic(**d).dict()
+    try:
+        return Elasticsearch(retry_on_timeout=True, **d)
+    except elasticsearch.ConnectionError as error:
+        logger.error(error)
 
 
-def setup_connections():
-    '''
-    Set connections to postgres, redis,
-    elasticsearch, init state.
-    '''
-    # connection to postgres
-    postgres_dict = get_postgres_dict()
-    # connection to elasticsearch
-    es_conn = get_es_instance()
-    with open(BASE_DIR / os.getenv('MAPPING_FILENAME'), 'r') as f:
+@backoff.on_exception(backoff.expo, redis.ConnectionError, max_tries=5)
+def get_redis_conn(RedisPydantic: pydantic.BaseModel) -> redis.Redis.client:
+    '''Get redis instance.'''
+    d = {'host': config.REDIS_HOST, 'port': config.REDIS_PORT}
+    d = RedisPydantic(**d).dict()
+    pool = redis.ConnectionPool(**d)
+    try:
+        return redis.Redis(connection_pool=pool)
+    except redis.ConnectionError as error:
+        logger.error(error)
+
+
+def set_es_index(es_cur: Elasticsearch) -> Elasticsearch:
+    '''Set elasticsearch index.'''
+    with open(BASE_DIR / config.ES_MAPPING_FILENAME, 'r') as f:
         mapping = json.load(f)
-    indices = es_conn.indices.get_alias().keys()
-    if 'movies' not in indices:
-        print('CREATING----------------')
-        es_conn.indices.create(index='movies', ignore=400, body=mapping)
-    es_conn.indices.get_mapping('movies')
-    client = redis.Redis(host='cache', port=6379, db=0)
-    state = State(client)
-    return postgres_dict, es_conn, state
+    indices = es_cur.indices.get_alias().keys()
+    if config.ES_INDEX not in indices:
+        es_cur.indices.create(index=config.ES_INDEX, ignore=HTTPStatus.BAD_REQUEST, body=mapping)
+        logger.error('Creating es ondex ...')
+    es_cur.indices.get_mapping(config.ES_INDEX)
+    logger.error('Getting es ondex ...')
+    return es_cur
 
 
-def get_min_max_state(postgres_dict: Dict) -> Tuple[datetime]:
+def setup_connections() -> list[psycopg2.connect, Elasticsearch, redis.Redis.client, State]:
+    '''Set connections to postgres, redis, elasticsearch, init state.'''
+    postgres_conn = get_postgres_conn(PostgresPydantic)
+    es_conn = set_es_index(get_es_conn(EsPydantic))
+    redis_conn = get_redis_conn(RedisPydantic)
+    state = State(redis_conn)
+    logger.info('Connections were set successfully ...')
+    return postgres_conn, es_conn, redis_conn, state
+
+
+def get_min_max_state(postgres_cur: psycopg2.extensions.cursor) -> tuple[datetime]:
     '''Get min and max date from postgres.'''
-    with psycopg2.connect(**postgres_dict) as postgres_conn:
-        with postgres_conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute("""SELECT min(updated_at) FROM filmwork""")
-            min_state = cursor.fetchall()[0][0]
-            cursor.execute("""SELECT max(updated_at) FROM filmwork""")
-            max_state = cursor.fetchall()[0][0]
-            return min_state, max_state
+    postgres_cur.execute("""SELECT min(updated_at) FROM filmwork""")
+    min_state = postgres_cur.fetchall()[0][0]
+    postgres_cur.execute("""SELECT max(updated_at) FROM filmwork""")
+    max_state = postgres_cur.fetchall()[0][0]
+    logger.info('Getting min and max state ...')
+    return min_state, max_state
+
+
+def close_connections(postgres_cur, es_conn):
+    postgres_cur.close()
+    es_conn.transport.close()
