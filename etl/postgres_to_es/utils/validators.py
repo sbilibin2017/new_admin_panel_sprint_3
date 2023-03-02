@@ -27,7 +27,7 @@ class IndexData(BaseModel):
     genre: list[str]
     title: str
     description: str
-    director: str
+    director: list[str]
     actors_names: list[str]
     actors: list[dict]
     writers_names: list[str]

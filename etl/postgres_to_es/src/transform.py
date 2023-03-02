@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-
 from utils.logger import logger
 from utils.validators import IndexData
 
@@ -14,7 +13,7 @@ def build_es_data(
 
     DEFAULT_NUM = -1.0
     DEFAULT_STR = ''
-    DEFAULT_LIST = ['']
+    DEFAULT_LIST = []
 
     df['rating'].fillna(DEFAULT_NUM, inplace=True)
     df_sub = df[df['id'] == filmwork_id]
@@ -29,9 +28,9 @@ def build_es_data(
     d['description'] = df_sub['description'].iloc[0] or DEFAULT_STR
     subdf_dir = df_fwp_sub[df_fwp_sub['role'] == 'director']
     if len(subdf_dir) > 0:
-        d['director'] = subdf_dir['name'].iloc[0]
+        d['director'] = subdf_dir['name'].values.tolist()
     else:
-        d['director'] = DEFAULT_STR
+        d['director'] = DEFAULT_LIST
     for key in ['actor', 'writer']:
         subdf = df_fwp_sub[df_fwp_sub['role'] == key]
         if len(subdf) > 0:
